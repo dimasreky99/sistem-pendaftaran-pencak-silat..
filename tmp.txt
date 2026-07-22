@@ -1,0 +1,11 @@
+                    <div className="space-y-1.5">
+                      <div className="font-black text-slate-900 text-[11px] uppercase leading-tight">
+                        {formatClassName(m.className)}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[9px] font-bold text-slate-400">
+                        <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded uppercase font-black">
+                          {m.roundName}
+                        </span>
+
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded uppercase font-black">
+                          HARI {getDayNumber(m.partaiNum)}
