@@ -1,0 +1,160 @@
+  1201	        </div>
+  1202	
+  1203	        {/* ADMIN CONFIGURATION PANEL FOR GELANGGANG & SESSIONS */}
+  1204	        {userRole === "admin" && (
+  1205	          <div className="border-t border-slate-800 pt-4 mt-2 space-y-4">
+  1206	            <div className="bg-slate-900/50 rounded-2xl p-4.5 border border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-6">
+  1207	              {/* Config 1: Arena System Selector */}
+  1208	              <div className="space-y-2">
+  1209	                <label className="text-[10px] font-extrabold text-slate-400 tracking-wider uppercase flex items-center gap-1.5">
+  1210	                  <Layers size={13} className="text-emerald-500" />
+  1211	                  SISTEM ARENA / GELANGGANG
+  1212	                </label>
+  1213	                <div className="grid grid-cols-3 gap-2">
+  1214	                  {[1, 2, 3].map((g) => (
+  1215	                    <button
+  1216	                      key={g}
+  1217	                      onClick={() => setTotalGelanggang(g)}
+  1218	                      className={`py-2 rounded-xl text-xs font-black transition-all border ${
+  1219	                        totalGelanggang === g
+  1220	                          ? "bg-emerald-600 text-white border-emerald-500"
+  1221	                          : "bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700"
+  1222	                      }`}
+  1223	                    >
+  1224	                      {g} GELANGGANG
+  1225	                    </button>
+  1226	                  ))}
+  1227	                </div>
+  1228	              </div>
+  1229	
+  1230	              {/* Config 2: Limit Pagi */}
+  1231	              <div className="space-y-2">
+  1232	                <label className="text-[10px] font-extrabold text-slate-400 tracking-wider uppercase flex items-center gap-1.5">
+  1233	                  <Sunrise size={13} className="text-amber-500" />
+  1234	                  JUMLAH PARTAI SESI PAGI
+  1235	                </label>
+  1236	                <div className="flex items-center gap-2">
+  1237	                  <input
+  1238	                    type="range"
+  1239	                    min="5"
+  1240	                    max="50"
+  1241	                    step="5"
+  1242	                    value={limitPagi}
+  1243	                    readOnly
+  1244	                    className="flex-1 accent-emerald-500 bg-slate-950"
+  1245	                  />
+  1246	                  <input
+  1247	                    type="number"
+  1248	                    value={limitPagi}
+  1249	                    readOnly
+  1250	                    className="w-14 bg-slate-950 border border-slate-850 rounded-xl px-2 py-1.5 text-center text-xs font-black text-emerald-400"
+  1251	                  />
+  1252	                </div>
+  1253	              </div>
+  1254	
+  1255	              {/* Config 3: Limit Siang */}
+  1256	              <div className="space-y-2">
+  1257	                <label className="text-[10px] font-extrabold text-slate-400 tracking-wider uppercase flex items-center gap-1.5">
+  1258	                  <Sun size={13} className="text-orange-500" />
+  1259	                  JUMLAH PARTAI SESI SIANG
+  1260	                </label>
+  1261	                <div className="flex items-center gap-2">
+  1262	                  <input
+  1263	                    type="range"
+  1264	                    min="5"
+  1265	                    max="50"
+  1266	                    step="5"
+  1267	                    value={limitSiang}
+  1268	                    readOnly
+  1269	                    className="flex-1 accent-emerald-500 bg-slate-950"
+  1270	                  />
+  1271	                  <input
+  1272	                    type="number"
+  1273	                    value={limitSiang}
+  1274	                    readOnly
+  1275	                    className="w-14 bg-slate-950 border border-slate-850 rounded-xl px-2 py-1.5 text-center text-xs font-black text-emerald-400"
+  1276	                  />
+  1277	                </div>
+  1278	              </div>
+  1279	
+  1280	              {/* Config 4: Limit Malam */}
+  1281	              <div className="space-y-2">
+  1282	                <label className="text-[10px] font-extrabold text-slate-400 tracking-wider uppercase flex items-center gap-1.5">
+  1283	                  <Moon size={13} className="text-sky-500" />
+  1284	                  JUMLAH PARTAI SESI MALAM
+  1285	                </label>
+  1286	                <div className="flex items-center gap-2">
+  1287	                  <input
+  1288	                    type="range"
+  1289	                    min="5"
+  1290	                    max="50"
+  1291	                    step="5"
+  1292	                    value={limitMalam}
+  1293	                    readOnly
+  1294	                    className="flex-1 accent-emerald-500 bg-slate-950"
+  1295	                  />
+  1296	                  <input
+  1297	                    type="number"
+  1298	                    value={limitMalam}
+  1299	                    readOnly
+  1300	                    className="w-14 bg-slate-950 border border-slate-850 rounded-xl px-2 py-1.5 text-center text-xs font-black text-emerald-400"
+  1301	                  />
+  1302	                </div>
+  1303	              </div>
+  1304	            </div>
+  1305	
+  1306	            {/* Multi-day date configuration */}
+  1307	            <div className="bg-slate-900/50 rounded-2xl p-4.5 border border-slate-800 space-y-3">
+  1308	              <h4 className="text-[10px] font-black tracking-widest text-emerald-400 uppercase flex items-center gap-1.5">
+  1309	                <Calendar size={13} />
+  1310	                PENGATURAN TANGGAL PERTANDINGAN ({totalDays} HARI)
+  1311	              </h4>
+  1312	              <p className="text-[10px] text-slate-400 font-semibold leading-relaxed">
+  1313	                Sesuaikan penanggalan untuk setiap hari pertandingan. Jadwal sesi dan partai disesuaikan otomatis dengan Pengaturan Sistem (Tanggal Mulai & Selesai).
+  1314	              </p>
+  1315	              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pt-1">
+  1316	                {Array.from({ length: totalDays }).map((_, idx) => {
+  1317	                  const dayNum = idx + 1;
+  1318	                  return (
+  1319	                    <div key={dayNum} className="space-y-2 bg-slate-950 p-3 rounded-xl border border-slate-850">
+  1320	                      <label className="block text-[9px] font-extrabold text-slate-400 uppercase">
+  1321	                        HARI {dayNum}
+  1322	                      </label>
+  1323	                      <input
+  1324	                        type="text"
+  1325	                        value={getDayDateString(dayNum)}
+  1326	                        onChange={(e) => {
+  1327	                          const val = e.target.value;
+  1328	                          setCustomDayDates(prev => ({
+  1329	                            ...prev,
+  1330	                            [dayNum]: val
+  1331	                          }));
+  1332	                        }}
+  1333	                        placeholder={`Hari ${dayNum}`}
+  1334	                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+  1335	                      />
+  1336	                      <div className="mt-2 text-[10px] text-slate-500 text-center font-bold">
+  1337	                        Pagi: {limitPagi} | Siang: {limitSiang} | Malam: {limitMalam}
+  1338	                      </div>
+  1339	                    </div>
+  1340	                  );
+  1341	                })}
+  1342	              </div>
+  1343	            </div>
+  1344	
+  1345	            <div className="text-[10px] text-slate-400 font-bold mt-2.5 flex items-center gap-1">
+  1346	              <Check size={12} className="text-emerald-500" />
+  1347	              <span>Sesi Pagi, Siang, dan Malam akan mengelompokkan partai secara seimbang per hari sesuai kuota yang diatur.</span>
+  1348	            </div>
+  1349	          </div>
+  1350	        )}
+  1351	      </div>
+  1352	
+  1353	      {/* STATS OVERVIEW CARDS */}
+  1354	      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+  1355	        <div className="bg-white rounded-2xl p-5 border border-slate-100 flex items-center justify-between shadow-sm">
+  1356	          <div>
+  1357	            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Partai Terbentuk</div>
+  1358	            <div className="text-2xl font-black text-slate-900 mt-1">{stats.total}</div>
+  1359	          </div>
+  1360	          <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">

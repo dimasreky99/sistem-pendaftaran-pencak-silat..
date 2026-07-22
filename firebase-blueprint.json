@@ -1,0 +1,46 @@
+{
+  "entities": {
+    "Settings": {
+      "title": "Settings",
+      "description": "Global settings for the tournament",
+      "type": "object",
+      "properties": {}
+    },
+    "Contingent": {
+      "title": "Contingent",
+      "description": "A contingent participating in the tournament",
+      "type": "object",
+      "properties": {}
+    },
+    "Athlete": {
+      "title": "Athlete",
+      "description": "An athlete participating in the tournament",
+      "type": "object",
+      "properties": {}
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "System activity logs",
+      "type": "object",
+      "properties": {}
+    }
+  },
+  "firestore": {
+    "/globals/{docId}": {
+      "schema": "Settings",
+      "description": "Global documents like settings"
+    },
+    "/contingents/{contingentId}": {
+      "schema": "Contingent",
+      "description": "List of contingents"
+    },
+    "/athletes/{athleteId}": {
+      "schema": "Athlete",
+      "description": "List of athletes"
+    },
+    "/logs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "List of activity logs"
+    }
+  }
+}

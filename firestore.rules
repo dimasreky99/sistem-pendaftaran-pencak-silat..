@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // For this specific application which uses its own custom auth layer 
+    // instead of Firebase Auth, we must allow access so the app can function.
+    // In a production scenario, we would integrate Firebase Auth properly.
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
