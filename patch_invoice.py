@@ -1,34 +1,42 @@
 import re
 
-with open('src/components/PembayaranContingentView.tsx', 'r') as f:
+with open('src/components/AdminPaymentManagement.tsx', 'r') as f:
     content = f.read()
 
-old_code = """              <div className="flex gap-2">
+# Edit the table header
+header_old = """                  <th className="py-3.5 px-4 text-center">Bukti Bayar</th>"""
+header_new = """                  <th className="py-3.5 px-4">Invoice</th>
+                  <th className="py-3.5 px-4 text-center">Bukti Bayar</th>"""
+content = content.replace(header_old, header_new)
 
-                <button
-                  onClick={() => setShowPrintInvoice(true)}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
-                >
-                  <FileText size={14} /> Cetak Invoice
-                </button>
-              </div>"""
+# Edit the table row
+row_old = """                      {/* Bill and Status */}"""
+row_new = """                      {/* Invoice */}
+                      <td className="py-4 px-4">
+                        <div className="flex flex-col gap-1.5">
+                          {contingent.customInvoiceNumber ? (
+                            <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded w-fit border border-slate-200">
+                              {contingent.customInvoiceNumber}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-medium italic">Belum di-generate</span>
+                          )}
+                          <button
+                            onClick={() => {
+                              const newInv = prompt("Masukkan Nomor Invoice Khusus (kosongkan untuk hapus):", contingent.customInvoiceNumber || "");
+                              if (newInv !== null && onUpdateInvoiceNumber) {
+                                onUpdateInvoiceNumber(contingent.id, newInv || "");
+                              }
+                            }}
+                            className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold underline decoration-emerald-200 underline-offset-2 w-fit transition-all"
+                          >
+                            Edit Nomor
+                          </button>
+                        </div>
+                      </td>
+                      {/* Bill and Status */}"""
+content = content.replace(row_old, row_new)
 
-new_code = """              <div className="flex items-center gap-2">
-                {contingent.paymentStatus === "Lunas" ? (
-                  <button
-                    onClick={() => setShowPrintInvoice(true)}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-                  >
-                    <FileText size={14} /> Cetak Invoice
-                  </button>
-                ) : (
-                  <p className="text-[10px] text-slate-500 font-semibold max-w-[200px] text-right italic">
-                    Jika terkonfirmasi lunas maka invoice akan muncul.
-                  </p>
-                )}
-              </div>"""
-
-content = content.replace(old_code, new_code)
-
-with open('src/components/PembayaranContingentView.tsx', 'w') as f:
+with open('src/components/AdminPaymentManagement.tsx', 'w') as f:
     f.write(content)
+
