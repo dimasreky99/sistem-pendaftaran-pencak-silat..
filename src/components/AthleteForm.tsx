@@ -28,7 +28,7 @@ export default function AthleteForm({
   const [nowa, setNowa] = useState("");
   const [customData, setCustomData] = useState<string[]>([]);
   const [fotos, setFotos] = useState<string[]>([]);
-  const [matchType, setMatchType] = useState<"Prestasi" | "Pemasalan">("Prestasi");
+  const [matchType, setMatchType] = useState<"Prestasi" | "Pemasalan">(settings.matchType === "Pemasalan" ? "Pemasalan" : "Prestasi");
   
   const [loading, setLoading] = useState(false);
   const [nikError, setNikError] = useState("");
@@ -124,35 +124,43 @@ export default function AthleteForm({
 
       // Auto assign Category based on Year ranges defined in settings
       let matchedCategory = "";
-      Object.keys(settings.classData).forEach(cat => {
+      
+      const allowedKeys = Object.keys(settings.classData).filter(cat => {
         const conf = settings.classData[cat];
-        if (conf.active && conf.minYear && conf.maxYear) {
+        if (!conf.active) return false;
+        
+        if (matchType === "Prestasi") {
+          return conf.isPrestasi !== false;
+        } else if (matchType === "Pemasalan") {
+          return conf.isPemasalan !== false;
+        }
+        return false;
+      });
+
+      allowedKeys.forEach(cat => {
+        const conf = settings.classData[cat];
+        if (conf.minYear && conf.maxYear) {
           if (fullYear >= conf.minYear && fullYear <= conf.maxYear) {
             matchedCategory = cat;
           }
         }
       });
 
-      // Standard fallback categorization if configs are missing
       if (!matchedCategory) {
-        if (age <= 5) matchedCategory = "Pra Usia Dini";
-        else if (age <= 8) matchedCategory = "Usia Dini 1";
-        else if (age <= 11) matchedCategory = "Usia Dini 2";
-        else if (age <= 14) matchedCategory = "Pra Remaja";
-        else if (age <= 17) matchedCategory = "Remaja";
-        else if (age <= 35) matchedCategory = "Dewasa";
-        else if (age <= 45) matchedCategory = "Master 1";
-        else matchedCategory = "Master 2";
+        setNikError(`Tidak ada kategori aktif yang sesuai dengan tahun lahir ${fullYear} pada skema ${matchType}.`);
+        return;
       }
 
-      // Apply changes
-      setTglLahir(dobStr);
+      setTglLahir(`${fullYear}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`);
       setJk(calculatedJk);
       setKategori(matchedCategory);
       setKelas(""); // Reset class for category
 
       // Trigger standard sweetalert / native notification
-      alert(`NIK VALID!\nLahir: ${dd}/${mm}/${fullYear} (${age} tahun)\nGender: ${calculatedJk}\nKategori: ${matchedCategory}`);
+      /* alert(`NIK VALID!
+Lahir: ${dd}/${mm}/${fullYear} (${age} tahun)
+Gender: ${calculatedJk}
+Kategori: ${matchedCategory}`); */
     }
   };
 
@@ -429,6 +437,14 @@ export default function AthleteForm({
                 onChange={(e) => {
                   setMatchType(e.target.value as any);
                   setKelas("");
+                  if (nik.length === 16) {
+                     // small timeout to ensure state is updated if we were to use a ref, 
+                     // but handleNikChange uses state. Actually handleNikChange takes the value as parameter, 
+                     // but it uses the old matchType from closure! 
+                     // This could be a bug. We should probably reset NIK or just show a message.
+                     setNik("");
+                     setNikError("Skema diubah, silakan ketik ulang atau copy-paste NIK Anda.");
+                  }
                 }}
                 className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all cursor-pointer"
               >

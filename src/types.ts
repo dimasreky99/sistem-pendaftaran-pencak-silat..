@@ -11,6 +11,8 @@ export interface CategoryConfig {
   classes: ClassConfig[];
   minYear?: number;
   maxYear?: number;
+  isPrestasi?: boolean;
+  isPemasalan?: boolean;
 }
 
 export interface SystemSettings {
@@ -37,6 +39,8 @@ export interface SystemSettings {
   eventStartDate?: string;
   eventEndDate?: string;
   adminWaNumber?: string;
+  waApiUrl?: string;
+  waApiKey?: string;
   bestFighterScheme?: "Prestasi" | "Pemasalan" | "Keduanya" | "Per Kategori Umur";
 }
 
@@ -48,6 +52,7 @@ export interface Contingent {
   username: string;
   passwordHash: string;
   role: "admin" | "kontingen";
+  receiveNotifications?: boolean;
   paymentStatus: "Lunas" | "Belum Lunas";
   buktiTransferUrl: string; // Base64 data or image link
   kodeUnik: number; // Unique payment suffix code

@@ -53,8 +53,8 @@ export default function IdCardPreview({
           let photoUrl = "";
           if ("photoUrl" in tgt && tgt.photoUrl) {
             photoUrl = tgt.photoUrl;
-          } else if (!isOfficial && "fotos" in tgt && tgt.fotos && tgt.fotos[0]) {
-            photoUrl = tgt.fotos[0];
+          } else if (!isOfficial && "fotos" in tgt && tgt.fotos && tgt.fotos?.[0]) {
+            photoUrl = tgt.fotos?.[0];
           }
 
           return (

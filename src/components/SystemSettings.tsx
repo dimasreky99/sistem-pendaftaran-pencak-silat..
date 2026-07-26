@@ -3,7 +3,6 @@ import {
   Settings, ShieldAlert, Award, Calendar, Image as ImageIcon, DollarSign, Plus, Trash2, ArrowUpRight, HelpCircle, HardDriveDownload
 } from "lucide-react";
 import { SystemSettings, CategoryConfig } from "../types";
-import { generateDummyAthletes } from "../dummy";
 
 import { DEFAULT_KELAS_IPSI } from "../constants";
 
@@ -50,6 +49,12 @@ export default function SystemSettingsComponent({
   const [ipsiActiveTab, setIpsiActiveTab] = useState<"prestasi" | "pemasalan">("prestasi");
   const [isPrestasiOpen, setIsPrestasiOpen] = useState(false);
   const [isPemasalanOpen, setIsPemasalanOpen] = useState(false);
+  const PRESTASI_KEYS = ["Remaja", "Dewasa", "Master 1", "Master 2"];
+  const PEMASALAN_KEYS = ["Pra Usia Dini", "Usia Dini 1", "Usia Dini 2", "Pra Remaja"];
+  
+  const getPrestasiKeys = () => Object.keys(localSettings.classData);
+  const getPemasalanKeys = () => Object.keys(localSettings.classData);
+
   const [isSekretariatSettingsOpen, setIsSekretariatSettingsOpen] = useState(false);
 
   // Custom non-blocking notification & modal states to prevent iframe browser blocking
@@ -126,6 +131,35 @@ export default function SystemSettingsComponent({
       };
     });
   };
+
+  const handleToggleCategoryPrestasi = (cat: string) => {
+    setLocalSettings(prev => {
+      const updatedClassData = { ...prev.classData };
+      updatedClassData[cat] = {
+        ...updatedClassData[cat],
+        isPrestasi: updatedClassData[cat].isPrestasi === undefined ? false : !updatedClassData[cat].isPrestasi
+      };
+      return {
+        ...prev,
+        classData: updatedClassData
+      };
+    });
+  };
+
+  const handleToggleCategoryPemasalan = (cat: string) => {
+    setLocalSettings(prev => {
+      const updatedClassData = { ...prev.classData };
+      updatedClassData[cat] = {
+        ...updatedClassData[cat],
+        isPemasalan: updatedClassData[cat].isPemasalan === undefined ? false : !updatedClassData[cat].isPemasalan
+      };
+      return {
+        ...prev,
+        classData: updatedClassData
+      };
+    });
+  };
+
 
   const handleToggleCategoryBebas = (category: string) => {
     setLocalSettings(prev => {
@@ -960,8 +994,7 @@ export default function SystemSettingsComponent({
 
                 {isPrestasiOpen && (
                   <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto animate-fadeIn">
-                    {Object.keys(localSettings.classData)
-                      .map((cat) => {
+                    {getPrestasiKeys().map((cat) => {
                         const config = localSettings.classData[cat];
                         return (
                           <div key={cat} className="bg-white border border-slate-200 rounded-2xl p-4 space-y-2 text-left shadow-sm">
@@ -969,13 +1002,13 @@ export default function SystemSettingsComponent({
                               <span className="font-extrabold text-slate-800 text-xs truncate max-w-[150px]">{cat}</span>
                               <input
                                 type="checkbox"
-                                checked={config.active}
-                                onChange={() => handleToggleCategoryActive(cat)}
+                                checked={config.isPrestasi ?? true}
+                                onChange={() => handleToggleCategoryPrestasi(cat)}
                                 className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
                               />
                             </div>
 
-                            {config.active && (
+                            {(config.isPrestasi ?? true) && (
                               <div className="space-y-2 pt-1 border-t border-slate-200/50">
                                 {/* Year limits */}
                                 <div className="flex items-center justify-between gap-2">
@@ -1065,8 +1098,7 @@ export default function SystemSettingsComponent({
 
                 {isPemasalanOpen && (
                   <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto animate-fadeIn">
-                    {Object.keys(localSettings.classData)
-                      .map((cat) => {
+                    {getPemasalanKeys().map((cat) => {
                         const config = localSettings.classData[cat];
                         return (
                           <div key={cat} className="bg-white border border-slate-200 rounded-2xl p-4 space-y-2 text-left shadow-sm">
@@ -1074,13 +1106,13 @@ export default function SystemSettingsComponent({
                               <span className="font-extrabold text-slate-800 text-xs truncate max-w-[150px]">{cat}</span>
                               <input
                                 type="checkbox"
-                                checked={config.active}
-                                onChange={() => handleToggleCategoryActive(cat)}
+                                checked={config.isPemasalan ?? true}
+                                onChange={() => handleToggleCategoryPemasalan(cat)}
                                 className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
                               />
                             </div>
 
-                            {config.active && (
+                            {(config.isPemasalan ?? true) && (
                               <div className="space-y-2 pt-1 border-t border-slate-200/50">
                                 {/* Year limits */}
                                 <div className="flex items-center justify-between gap-2">
@@ -1179,35 +1211,34 @@ export default function SystemSettingsComponent({
         </button>
       </div>
 
-      {/* DEBUG/TESTING AREA */}
-      <div className="bg-amber-50 rounded-3xl p-6 border border-amber-200 space-y-4">
-        <h3 className="font-extrabold text-amber-800 text-sm uppercase tracking-tight flex items-center gap-2">
-          <ShieldAlert size={18} className="text-amber-600" />
-          Pengujian Bagan (Otomatis)
+      {/* Section: API Notifikasi WhatsApp */}
+      <div className="col-span-1 md:col-span-2 bg-white rounded-3xl p-5 lg:p-6 border border-slate-100 shadow-sm space-y-4">
+        <h3 className="font-extrabold text-slate-900 text-sm uppercase tracking-tight flex items-center gap-2 border-b border-slate-100 pb-3">
+          Integrasi API WhatsApp
         </h3>
-        <p className="text-xs text-amber-700 font-semibold leading-relaxed leading-normal">
-          Klik tombol di bawah untuk membuat data 2-50 atlet dummy secara acak untuk SETIAP kelas aktif yang bukan kategori bebas. 
-          Gunakan aksi ini hanya jika database Anda masih kosong atau saat menguji sistem bagan pertandingan!
-        </p>
-        <div className="flex flex-wrap gap-3.5">
-          <button
-            onClick={async () => {
-              if (window.confirm("Apakah Anda yakin ingin menginjeksi ratusan/ribuan atlet palsu ke dalam sistem ini? Aksi ini akan mempengaruhi beban Firestore Anda.")) {
-                try {
-                  showToast("Memproses injeksi data atlet dummy ke Firestore... Harap tunggu.");
-                  await generateDummyAthletes(localSettings, 2);
-                  showToast("Berhasil memasukkan data atlet dummy ke seluruh kelas pertandingan!");
-                } catch (e) {
-                  console.error(e);
-                  alert("Gagal menginjeksi data. Periksa konsol.");
-                }
-              }
-            }}
-            className="bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-[10px] px-6 py-3.5 rounded-2xl transition-all shadow-md uppercase"
-          >
-            🧪 GENERATE DUMMY ATLET (2-50 / KELAS)
-          </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">URL Endpoint API (mis. Fonnte / Wablas)</label>
+            <input
+              type="text"
+              value={localSettings.waApiUrl || ""}
+              onChange={(e) => setLocalSettings({...localSettings, waApiUrl: e.target.value})}
+              placeholder="https://api.fonnte.com/send"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">API Token / API Key</label>
+            <input
+              type="text"
+              value={localSettings.waApiKey || ""}
+              onChange={(e) => setLocalSettings({...localSettings, waApiKey: e.target.value})}
+              placeholder="YOUR_API_TOKEN"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            />
+          </div>
         </div>
+        <p className="text-[10px] text-slate-400 font-medium">Kosongkan jika Anda tidak menggunakan notifikasi WA otomatis. Payload API mengikuti format Fonnte (POST, Authorization header, JSON body: target, message).</p>
       </div>
 
       {/* DANGEROUS DISASTER ACTION AREA: ARCHIVE & RESET SYSTEM */}

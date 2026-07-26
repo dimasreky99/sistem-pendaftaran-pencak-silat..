@@ -1459,7 +1459,7 @@ export default function BracketsModule({ athletes, userRole }: BracketsModulePro
                 const isClassSaved = localStorage.getItem("silat_bracket_" + cl) !== null;
                 return (
                   <option key={cl} value={cl}>
-                    {isClassSaved ? "✅ [TERSURAT] " : "⏳ [KOSONG] "} {cl} ({count} Calon Peserta)
+                    {isClassSaved ? "✅ [TERSURAT] " : "⏳ [KOSONG] "} {cl} ({count} Calon Peserta) {count >= 2 && count <= 10 ? "[Skala Kecil]" : count > 10 ? "[Skala Besar]" : ""}
                   </option>
                 );
               })}
@@ -1594,7 +1594,19 @@ export default function BracketsModule({ athletes, userRole }: BracketsModulePro
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col justify-between shadow-inner">
               <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Info Calon Peserta</span>
               <div className="text-xs font-extrabold text-slate-800 mt-1 flex justify-between items-center">
-                <span>Terdapat <span className="text-emerald-600">{classAthletes.length} Atlet Valid</span></span>
+                <div className="flex items-center gap-2">
+                  <span>Terdapat <span className="text-emerald-600">{classAthletes.length} Atlet Valid</span></span>
+                  {classAthletes.length >= 2 && classAthletes.length <= 10 && (
+                    <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[9px] uppercase font-black tracking-wider flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Skala Kecil
+                    </span>
+                  )}
+                  {classAthletes.length >= 11 && (
+                    <span className="bg-rose-100 text-rose-800 px-2 py-0.5 rounded text-[9px] uppercase font-black tracking-wider flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Skala Besar
+                    </span>
+                  )}
+                </div>
                 <button
                   onClick={() => setShowParticipantsModal(true)}
                   className="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-extrabold text-[10px] px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer"

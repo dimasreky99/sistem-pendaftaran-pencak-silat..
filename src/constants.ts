@@ -3,6 +3,8 @@ import { SystemSettings, Contingent, Athlete, ActivityLog } from "./types";
 export const DEFAULT_KELAS_IPSI: Record<string, any> = {
   "Pra Usia Dini": {
     active: true,
+    isPrestasi: true,
+    isPemasalan: true,
     isBebas: false,
     minYear: 2019,
     maxYear: 2021,
@@ -12,6 +14,8 @@ export const DEFAULT_KELAS_IPSI: Record<string, any> = {
   },
   "Usia Dini 1": {
     active: true,
+    isPrestasi: true,
+    isPemasalan: true,
     isBebas: false,
     minYear: 2016,
     maxYear: 2018,
@@ -24,6 +28,8 @@ export const DEFAULT_KELAS_IPSI: Record<string, any> = {
   },
   "Usia Dini 2": {
     active: true,
+    isPrestasi: true,
+    isPemasalan: true,
     isBebas: false,
     minYear: 2014,
     maxYear: 2015,
@@ -60,6 +66,8 @@ export const DEFAULT_KELAS_IPSI: Record<string, any> = {
   },
   "Pra Remaja": {
     active: true,
+    isPrestasi: true,
+    isPemasalan: true,
     isBebas: false,
     minYear: 2011,
     maxYear: 2013,
@@ -95,6 +103,8 @@ export const DEFAULT_KELAS_IPSI: Record<string, any> = {
   },
   "Remaja": {
     active: true,
+    isPrestasi: true,
+    isPemasalan: true,
     isBebas: false,
     minYear: 2008,
     maxYear: 2010,
@@ -124,6 +134,8 @@ export const DEFAULT_KELAS_IPSI: Record<string, any> = {
   },
   "Dewasa": {
     active: true,
+    isPrestasi: true,
+    isPemasalan: true,
     isBebas: false,
     minYear: 1991,
     maxYear: 2007,
@@ -151,6 +163,8 @@ export const DEFAULT_KELAS_IPSI: Record<string, any> = {
   },
   "Master 1": {
     active: true,
+    isPrestasi: true,
+    isPemasalan: true,
     isBebas: false,
     minYear: 1981,
     maxYear: 1990,
@@ -181,6 +195,8 @@ export const DEFAULT_KELAS_IPSI: Record<string, any> = {
   },
   "Master 2": {
     active: true,
+    isPrestasi: true,
+    isPemasalan: true,
     isBebas: false,
     minYear: 1966,
     maxYear: 1980,

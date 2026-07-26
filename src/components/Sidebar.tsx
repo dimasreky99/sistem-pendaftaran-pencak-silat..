@@ -39,11 +39,13 @@ export default function Sidebar({
 
   const mainMenuItems = [
     { id: "dashboard", label: "Dashboard", icon: BarChart3, roles: ["admin", "kontingen"] },
+    { id: "rekap-kontingen", label: "Rekap Kelas", icon: ClipboardList, roles: ["kontingen"] },
     { id: "profile", label: "Data Profil", icon: User, roles: ["admin", "kontingen"] },
     { id: "pembayaran_kontingen", label: "Pembayaran", icon: CreditCard, roles: ["kontingen"] },
     { id: "kelola-pembayaran", label: "Pembayaran", icon: CreditCard, roles: ["admin"] },
     { id: "atlet-seluruh", label: "Data Seluruh Peserta", icon: Users, roles: ["admin"] },
-  ];
+    { id: "statistik-distribusi", label: "Statistik & Distribusi", icon: BarChart3, roles: ["admin"] },
+];
 
   const sekretariatItems = [
     { id: "bagan-pertandingan", label: "Bagan Pertandingan", icon: Award, roles: ["admin", "kontingen"] },
@@ -151,62 +153,59 @@ export default function Sidebar({
               })}
 
               {/* Sekretariat Pertandingan Dropdown */}
+              <div className="pt-4 border-t border-slate-800/40">
+                <button
+                  type="button"
+                  onClick={() => setIsSekretariatOpen(!isSekretariatOpen)}
+                  className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold text-slate-400 hover:text-slate-200 uppercase tracking-widest transition-colors text-left cursor-pointer"
+                >
+                  <span>Sekretariat Pertandingan</span>
+                  {isSekretariatOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                </button>
+              </div>
+              
+              {isSekretariatOpen && (
+                <div className="space-y-1.5 pl-2 transition-all pb-2">
+                  {filteredSekretariatMenu.map((item) => {
+                    const Icon = item.icon;
+                    const isSelected = activeView === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          onNavigate(item.id);
+                          onClose();
+                        }}
+                        className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl font-semibold text-xs transition-all text-left ${
+                          isSelected
+                            ? "bg-gradient-to-r from-emerald-850 to-emerald-700 text-white shadow-md border border-emerald-800/30"
+                            : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-100"
+                        }`}
+                      >
+                        <Icon size={15} />
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              
+              {/* Pengaturan & Akun */}
               {userRole === "admin" && (
                 <>
                   <div className="pt-4 border-t border-slate-800/40">
                     <button
                       type="button"
-                      onClick={() => setIsSekretariatOpen(!isSekretariatOpen)}
+                      onClick={() => setIsPengaturanOpen(!isPengaturanOpen)}
                       className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold text-slate-400 hover:text-slate-200 uppercase tracking-widest transition-colors text-left cursor-pointer"
                     >
-                      <span>Sekretariat Pertandingan</span>
-                      {isSekretariatOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      <span>Pengaturan & Akun</span>
+                      {isPengaturanOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                     </button>
                   </div>
-
-                  {isSekretariatOpen && (
-                    <div className="space-y-1.5 pl-2 transition-all">
-                      {filteredSekretariatMenu.map((item) => {
-                        const Icon = item.icon;
-                        const isSelected = activeView === item.id;
-                        return (
-                          <button
-                            key={item.id}
-                            onClick={() => {
-                              onNavigate(item.id);
-                              onClose();
-                            }}
-                            className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl font-semibold text-xs transition-all text-left ${
-                              isSelected
-                                ? "bg-gradient-to-r from-emerald-800 to-emerald-700 text-white shadow-sm"
-                                : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-100"
-                            }`}
-                          >
-                            <Icon size={15} className={isSelected ? "text-white" : "text-slate-500"} />
-                            {item.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </>
-              )}
-
-              <div className="pt-4 border-t border-slate-800/40">
-                <button
-                  type="button"
-                  onClick={() => setIsPengaturanOpen(!isPengaturanOpen)}
-                  className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold text-slate-400 hover:text-slate-200 uppercase tracking-widest transition-colors text-left cursor-pointer"
-                >
-                  <span>Pengaturan & Akun</span>
-                  {isPengaturanOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                </button>
-              </div>
-              
-              {isPengaturanOpen && (
-                <div className="space-y-1.5 pl-2 transition-all pb-4">
-                  {userRole === "admin" && (
-                    <>
+                  
+                  {isPengaturanOpen && (
+                    <div className="space-y-1.5 pl-2 transition-all pb-4">
                       {username === "DIM" && (
                         <>
                           <button
@@ -253,20 +252,23 @@ export default function Sidebar({
                         <Settings size={15} />
                         Pengaturan Sistem
                       </button>
-                    </>
+                    </div>
                   )}
-                  <button
-                    onClick={() => {
-                      onLogout();
-                      onClose();
-                    }}
-                    className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl font-semibold text-xs text-rose-400 hover:bg-rose-950/20 hover:text-rose-300 transition-all text-left cursor-pointer"
-                  >
-                    <LogOut size={15} />
-                    Keluar Aplikasi
-                  </button>
-                </div>
+                </>
               )}
+
+              <div className="pt-4 border-t border-slate-800/40">
+                <button
+                  onClick={() => {
+                    onLogout();
+                    onClose();
+                  }}
+                  className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl font-semibold text-xs text-rose-400 hover:bg-rose-950/20 hover:text-rose-300 transition-all text-left cursor-pointer"
+                >
+                  <LogOut size={15} />
+                  Keluar Aplikasi
+                </button>
+              </div>
             </div>
 
             {/* Active Users Block */}

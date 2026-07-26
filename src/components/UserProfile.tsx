@@ -23,6 +23,7 @@ export default function UserProfile({ currentUser, onUpdateProfile, onUpdatePass
   const [official1PhotoUrl, setOfficial1PhotoUrl] = useState(currentUser.official1PhotoUrl || "");
   const [official2Name, setOfficial2Name] = useState(currentUser.official2Name || "");
   const [official2PhotoUrl, setOfficial2PhotoUrl] = useState(currentUser.official2PhotoUrl || "");
+  const [receiveNotifications, setReceiveNotifications] = useState(currentUser.receiveNotifications ?? true);
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +62,8 @@ export default function UserProfile({ currentUser, onUpdateProfile, onUpdatePass
       official1Name,
       official1PhotoUrl,
       official2Name,
-      official2PhotoUrl
+      official2PhotoUrl,
+      receiveNotifications
     });
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
@@ -138,6 +140,8 @@ export default function UserProfile({ currentUser, onUpdateProfile, onUpdatePass
                 />
               </div>
 
+              
+
               {currentUser.role !== "admin" && (
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Nama Kontingen</label>
@@ -180,6 +184,21 @@ export default function UserProfile({ currentUser, onUpdateProfile, onUpdatePass
                   />
                 </div>
               </div>
+              
+              {currentUser.role === "admin" && (
+                <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl mt-4">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800">Terima Notifikasi WA</h4>
+                    <p className="text-[10px] text-slate-500 font-medium">Terima pemberitahuan saat ada pendaftaran atau aktivitas baru.</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" checked={receiveNotifications} onChange={(e) => setReceiveNotifications(e.target.checked)} />
+                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+              )}
+
+              
 
               {currentUser.role !== "admin" && (
                 <div className="space-y-4 pt-4 border-t border-slate-100">
@@ -283,7 +302,7 @@ export default function UserProfile({ currentUser, onUpdateProfile, onUpdatePass
                 />
               </div>
             </div>
-
+            
             <div className="space-y-1.5">
               <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Password Baru</label>
               <div className="relative">
@@ -298,7 +317,7 @@ export default function UserProfile({ currentUser, onUpdateProfile, onUpdatePass
                 />
               </div>
             </div>
-
+            
             <div className="space-y-1.5">
               <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Konfirmasi Password Baru</label>
               <div className="relative">
@@ -313,7 +332,7 @@ export default function UserProfile({ currentUser, onUpdateProfile, onUpdatePass
                 />
               </div>
             </div>
-
+            
             <button
               type="submit"
               className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs py-3.5 rounded-xl transition-all shadow-md shadow-emerald-950/10 uppercase tracking-wider mt-4"

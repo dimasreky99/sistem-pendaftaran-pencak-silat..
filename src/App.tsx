@@ -1,6 +1,10 @@
 import { useGoogleLogin } from '@react-oauth/google';
+import DoubleConfirmModal from './components/DoubleConfirmModal';
 import { syncAllDataToSheets, createNewSpreadsheet } from './lib/sheetsSync';
+import { sendAutoWhatsApp } from "./lib/whatsapp";
 import React, { useState, useEffect } from "react";
+import * as XLSX from "xlsx";
+
 import LoadingOverlay from "./components/LoadingOverlay";
 
 import { 
@@ -11,8 +15,12 @@ import {
   DEFAULT_SETTINGS, INITIAL_CONTINGENTS, INITIAL_ATHLETES, INITIAL_LOGS, DEFAULT_KELAS_IPSI
 } from "./constants";
 import Sidebar from "./components/Sidebar";
+import CountdownWidget from "./components/CountdownWidget";
 import DashboardAdmin from "./components/DashboardAdmin";
+import AdminStatistics from "./components/AdminStatistics";
 import DashboardContingent from "./components/DashboardContingent";
+import RekapKontingen from "./components/RekapKontingen";
+import CetakLaporanPDF from "./components/CetakLaporanPDF";
 import PembayaranContingentView from "./components/PembayaranContingentView";
 import AthleteForm from "./components/AthleteForm";
 import WeighIn from "./components/WeighIn";
@@ -153,12 +161,49 @@ export default function App() {
 
   const [logs, setLogs, isLogsLoaded] = useFirebaseCollection<ActivityLog>("logs", INITIAL_LOGS);
 
+
+  // Global Event Listener for Archive and Reset
+  useEffect(() => {
+    const handleArchiveAndReset = () => {
+      try {
+        const wb = XLSX.utils.book_new();
+        const athletesSheet = XLSX.utils.json_to_sheet(athletes.map(a => ({
+          ID: a.id, Nama: a.name, NIK: a.nik, "Tanggal Lahir": a.tglLahir,
+          "Jenis Kelamin": a.jk, Kategori: a.kategori, Kelas: a.kelas,
+          Kontingen: a.kontingen, WhatsApp: a.nowa,
+          Status: a.isAcc ? "ACC" : "BELUM ACC"
+        })));
+        XLSX.utils.book_append_sheet(wb, athletesSheet, "Data Atlet");
+
+        const contingentsSheet = XLSX.utils.json_to_sheet(contingents.filter(c => c.role !== 'admin').map(c => ({
+          ID: c.id, "Nama Kontingen": c.contingentName, "Penanggung Jawab": c.pjName,
+          Username: c.username, WhatsApp: c.nowa, "Status Pembayaran": c.paymentStatus
+        })));
+        XLSX.utils.book_append_sheet(wb, contingentsSheet, "Data Kontingen");
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        XLSX.writeFile(wb, `Backup_Turnamen_${dateStr}.xlsx`);
+        
+        // Now using our new setAthletes wrapper which actually deletes elements
+        setAthletes([]);
+        setContingents(prev => prev.filter(c => c.role === 'admin'));
+        alert("Data berhasil diarsipkan dan diunduh. Database turnamen telah direset.");
+      } catch (err) {
+        console.error("Archive error:", err);
+        alert("Terjadi kesalahan saat mengarsipkan data.");
+      }
+    };
+    window.addEventListener('archive-and-reset-db', handleArchiveAndReset);
+    return () => window.removeEventListener('archive-and-reset-db', handleArchiveAndReset);
+  }, [athletes, contingents, setAthletes, setContingents]);
+
   // --- APPLICATION STATE ---
   const [currentUser, setCurrentUser] = useState<Contingent | null>(() => {
     const saved = localStorage.getItem("silat_session");
     return saved ? JSON.parse(saved) : null;
   });
 
+  const [doubleConfirm, setDoubleConfirm] = useState<{ title: string; message: string; confirmWord: string; onConfirm: () => void } | null>(null);
   const [activeView, setActiveView] = useState<string>(() => {
     const savedSession = localStorage.getItem("silat_session");
     return savedSession ? "dashboard" : "login";
@@ -174,7 +219,8 @@ export default function App() {
   const [targetContingentForAdd, setTargetContingentForAdd] = useState<string | null>(null);
   const [enlargedPhoto, setEnlargedPhoto] = useState<string | null>(null);
   const [isViewingIdCard, setIsViewingIdCard] = useState(false);
-  const [bulkIdCardsTarget, setBulkIdCardsTarget] = useState<string | null>(null);
+  const [bulkIdCardsTargets, setBulkIdCardsTargets] = useState<string[]>([]);
+  const [isPrintingLaporan, setIsPrintingLaporan] = useState(false);
 
   // Authentication inputs
   const [loginUser, setLoginUser] = useState("");
@@ -383,6 +429,17 @@ export default function App() {
 
   // --- METHODS & LOGIC ---
 
+  const doSendWa = async (msg: string, tgt?: string | string[], conts?: Contingent[]) => {
+    const result = await sendAutoWhatsApp(msg, settings, tgt, conts);
+    if (result && result.targets && result.targets.length > 0) {
+      if (result.success) {
+        appendLog("WA_SENT", `WhatsApp berhasil dikirim ke: ${result.targets.join(", ")}`);
+      } else {
+        appendLog("WA_FAILED", `Gagal kirim WhatsApp ke: ${result.targets.join(", ")}. Error: ${result.error}`);
+      }
+    }
+  };
+
   const appendLog = (action: string, detail: string) => {
     const wibDate = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
     const newLog: ActivityLog = {
@@ -510,10 +567,8 @@ export default function App() {
     setActiveView("login");
     
     // WA Notification
-    const adminNum = settings.adminWaNumber || "6282123456789";
-    const waMessage = encodeURIComponent(`*PENDAFTARAN KONTINGEN BARU*\n\nNama Kontingen: ${konti}\nPenanggung Jawab: ${pj}\nNo WA: ${hp}\n\nMohon validasi kontingen ini.`);
-    const waUrl = `https://wa.me/${adminNum}?text=${waMessage}`;
-    window.open(waUrl, "_blank");
+    const waMessage = `*PENDAFTARAN KONTINGEN BARU*\n\nNama Kontingen: ${konti}\nPenanggung Jawab: ${pj}\nNo WA: ${hp}\n\nMohon validasi kontingen ini.`;
+    doSendWa(waMessage, undefined, contingents);
   };
 
   const handleCreateSubAdmin = (e: React.FormEvent) => {
@@ -591,17 +646,14 @@ export default function App() {
       setAthletes(prev => [...prev, newAtlet]);
       appendLog("TAMBAH ATLET", `Mendaftarkan atlet: ${athleteData.name} (${athleteData.nik})`);
       
-      // WA Notification
-      const adminNum = settings.adminWaNumber || "6282123456789";
-      const waMessage = encodeURIComponent(`*PENDAFTARAN ATLET BARU*
+      const waMessage = `*PENDAFTARAN ATLET BARU*
 
 Nama Atlet: ${athleteData.name}
 NIK: ${athleteData.nik}
 Kontingen: ${athleteData.kontingen}
 
-Mohon validasi kelengkapan berkas atlet ini.`);
-      const waUrl = `https://wa.me/${adminNum}?text=${waMessage}`;
-      window.open(waUrl, "_blank");
+Mohon validasi kelengkapan berkas atlet ini.`;
+      doSendWa(waMessage, undefined, contingents);
     }
 
     setIsEditingAthlete(false);
@@ -622,6 +674,12 @@ Mohon validasi kelengkapan berkas atlet ini.`);
   const handleUpdatePaymentStatus = (contingentName: string, status: "Lunas" | "Belum Lunas") => {
     setContingents(prev => prev.map(c => {
       if (c.contingentName === contingentName) {
+        const waMessage = `*UPDATE PEMBAYARAN*
+
+Halo Kontingen ${c.contingentName},
+Status pembayaran Anda telah diubah menjadi: *${status}*.`;
+        doSendWa(waMessage, c.nowa);
+        
         return {
           ...c,
           paymentStatus: status
@@ -636,9 +694,17 @@ Mohon validasi kelengkapan berkas atlet ini.`);
   };
 
   const handleDeleteContingent = (contingentName: string) => {
-    setContingents(prev => prev.filter(c => c.contingentName !== contingentName));
-    setAthletes(prev => prev.filter(a => a.kontingen !== contingentName));
-    appendLog("HAPUS KONTINGEN", `Admin menghapus kontingen ${contingentName} beserta seluruh atletnya.`);
+    setDoubleConfirm({
+      title: "Hapus Kontingen",
+      message: `Kontingen ${contingentName} beserta SELURUH data atletnya akan dihapus permanen.`,
+      confirmWord: "HAPUS",
+      onConfirm: () => {
+        setContingents(prev => prev.filter(c => c.contingentName !== contingentName));
+        setAthletes(prev => prev.filter(a => a.kontingen !== contingentName));
+        appendLog("HAPUS KONTINGEN", `Admin menghapus kontingen ${contingentName} beserta seluruh atletnya.`);
+        setDoubleConfirm(null);
+      }
+    });
   };
   const handleAddContingent = (newC: Contingent) => {
     setContingents(prev => [...prev, newC]);
@@ -660,11 +726,59 @@ Mohon validasi kelengkapan berkas atlet ini.`);
     }
     appendLog("UPLOAD BUKTI", `Kontingen ${contingentName} mengunggah bukti pembayaran`);
     
-    // WA Notification
-    const adminNum = settings.adminWaNumber || "6282123456789";
-    const waMessage = encodeURIComponent(`*UPLOAD BUKTI PEMBAYARAN*\n\nKontingen: ${contingentName}\nTelah mengunggah bukti pembayaran di sistem.\n\nSilakan cek dan validasi pembayaran pada menu Admin.`);
-    const waUrl = `https://wa.me/${adminNum}?text=${waMessage}`;
-    window.open(waUrl, "_blank");
+    const waMessage = `*UPLOAD BUKTI PEMBAYARAN*
+
+Kontingen: ${contingentName}
+Telah mengunggah bukti pembayaran di sistem.
+
+Silakan cek dan validasi pembayaran pada menu Admin.`;
+    doSendWa(waMessage, undefined, contingents);
+  };
+
+  const handleImportExcelAthletes = (importedAthletes: Athlete[]) => {
+    if (importedAthletes.length === 0) return;
+    
+    setAthletes(prev => {
+      const merged = [...prev];
+      for (const newAthlete of importedAthletes) {
+        merged.push({
+          ...newAthlete,
+          id: Date.now().toString() + Math.floor(Math.random() * 1000000).toString()
+        });
+      }
+      return merged;
+    });
+    
+    // Also create missing contingents automatically
+    const uniqueContingents = Array.from(new Set(importedAthletes.map(a => a.kontingen))).filter(Boolean);
+    if (uniqueContingents.length > 0) {
+      setContingents(prev => {
+        const merged = [...prev];
+        const existingNames = new Set(merged.map(c => c.contingentName.toLowerCase()));
+        let added = 0;
+        for (const cName of uniqueContingents) {
+          if (!existingNames.has(cName.toLowerCase())) {
+            merged.push({
+              id: "A_" + Date.now() + Math.floor(Math.random() * 1000),
+              pjName: "Imported PJ",
+              nowa: "000",
+              contingentName: cName,
+              username: cName.replace(/\s+/g, '').toLowerCase() + Math.floor(Math.random()*100),
+              passwordHash: "123456",
+              role: "kontingen",
+              paymentStatus: "Lunas",
+              buktiTransferUrl: "",
+              kodeUnik: Math.floor(100 + Math.random() * 900)
+            });
+            added++;
+          }
+        }
+        return added > 0 ? merged : prev;
+      });
+    }
+
+    appendLog("IMPORT EXCEL", `Mengimpor ${importedAthletes.length} atlet dari file Excel.`);
+    alert(`Berhasil mengimpor ${importedAthletes.length} atlet dari Excel.`);
   };
 
   const handleToggleAcc = (athleteId: string) => {
@@ -672,6 +786,13 @@ Mohon validasi kelengkapan berkas atlet ini.`);
       if (a.id === athleteId) {
         const nextVal = !a.isAcc;
         appendLog("ACC PESERTA", `${nextVal ? "Menyetujui" : "Membatalkan"} ACC Atlet ID: ${athleteId}`);
+        
+        const tgtContingent = contingents.find(c => c.contingentName === a.kontingen);
+        if (tgtContingent && tgtContingent.nowa) {
+          const statusText = nextVal ? "DITERIMA (ACC)" : "DIBATALKAN ACC";
+          const waMessage = `*STATUS VALIDASI ATLET*\n\nHalo Kontingen ${a.kontingen},\nStatus berkas atlet atas nama *${a.name}* telah diubah menjadi: *${statusText}*.`;
+          doSendWa(waMessage, tgtContingent.nowa);
+        }
         return {
           ...a,
           isAcc: nextVal,
@@ -722,6 +843,12 @@ Mohon validasi kelengkapan berkas atlet ini.`);
           "Koreksi Status Pembayaran",
           `Mengubah status bayar kontingen ${c.contingentName} menjadi ${status}`
         );
+        const waMessage = `*UPDATE PEMBAYARAN*
+
+Halo Kontingen ${c.contingentName},
+Status pembayaran Anda telah diubah menjadi: *${status}*.`;
+        doSendWa(waMessage, c.nowa);
+        
         return {
           ...c,
           paymentStatus: status
@@ -792,6 +919,21 @@ Mohon validasi kelengkapan berkas atlet ini.`);
     setAthletes(prev => prev.map(a => {
       if (a.id === athleteId) {
         appendLog("TOLAK ATLET", `Minta revisi atlet ID ${athleteId}: ${notes}`);
+        
+        const tgtContingent = contingents.find(c => c.contingentName === a.kontingen);
+        if (tgtContingent && tgtContingent.nowa) {
+           const waMessage = `*REVISI BERKAS ATLET*
+
+Halo Kontingen ${a.kontingen},
+Atlet atas nama *${a.name}* membutuhkan revisi.
+
+Catatan Admin:
+${notes}
+
+Mohon segera login dan perbaiki berkas atlet tersebut.`;
+           doSendWa(waMessage, tgtContingent.nowa);
+        }
+        
         return {
           ...a,
           isAcc: false,
@@ -803,11 +945,17 @@ Mohon validasi kelengkapan berkas atlet ini.`);
   };
 
   const handleDeleteAthlete = (athleteId: string) => {
-    if (window.confirm("Apakah Anda yakin ingin menghapus data atlet ini secara permanen?")) {
-      setAthletes(prev => prev.filter(a => a.id !== athleteId));
-      appendLog("HAPUS ATLET", `Menghapus atlet ID: ${athleteId}`);
-      setSelectedAthlete(null);
-    }
+    setDoubleConfirm({
+      title: "Hapus Data Atlet",
+      message: "Data atlet akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.",
+      confirmWord: "HAPUS",
+      onConfirm: () => {
+        setAthletes(prev => prev.filter(a => a.id !== athleteId));
+        appendLog("HAPUS ATLET", `Menghapus atlet ID: ${athleteId}`);
+        setSelectedAthlete(null);
+        setDoubleConfirm(null);
+      }
+    });
   };
 
   const handleSaveWeighIn = (
@@ -821,6 +969,9 @@ Mohon validasi kelengkapan berkas atlet ini.`);
       const updated = prev.map(a => {
         if (a.id === athleteId) {
           appendLog("TIMBANG", `Timbang berat ${weight} kg (${status}) untuk atlet ID: ${athleteId}`);
+          
+          const tgtContingent = contingents.find(c => c.contingentName === a.kontingen);
+
           return {
             ...a,
             beratAktual: weight,
@@ -864,7 +1015,7 @@ Mohon validasi kelengkapan berkas atlet ini.`);
     appendLog("GANTI PASSWORD", "Mengubah sandi akun");
   };
 
-  const handleUpdateProfile = (updatedData: { pjName: string; nowa: string; photoUrl?: string; managerPhotoUrl?: string; official1Name?: string; official1PhotoUrl?: string; official2Name?: string; official2PhotoUrl?: string; }) => {
+  const handleUpdateProfile = (updatedData: { pjName: string; nowa: string; photoUrl?: string; managerPhotoUrl?: string; official1Name?: string; official1PhotoUrl?: string; official2Name?: string; official2PhotoUrl?: string; receiveNotifications?: boolean; }) => {
     if (!currentUser) return;
 
     setContingents(prev => prev.map(c => {
@@ -878,7 +1029,8 @@ Mohon validasi kelengkapan berkas atlet ini.`);
           official1Name: updatedData.official1Name,
           official1PhotoUrl: updatedData.official1PhotoUrl,
           official2Name: updatedData.official2Name,
-          official2PhotoUrl: updatedData.official2PhotoUrl
+          official2PhotoUrl: updatedData.official2PhotoUrl,
+          receiveNotifications: updatedData.receiveNotifications !== undefined ? updatedData.receiveNotifications : c.receiveNotifications
         };
       }
       return c;
@@ -899,7 +1051,8 @@ Mohon validasi kelengkapan berkas atlet ini.`);
       ...prev, 
       pjName: updatedData.pjName, 
       nowa: updatedData.nowa, 
-      photoUrl: updatedData.photoUrl 
+      photoUrl: updatedData.photoUrl,
+      receiveNotifications: updatedData.receiveNotifications !== undefined ? updatedData.receiveNotifications : prev.receiveNotifications
     } : null);
 
     appendLog("UPDATE PROFIL", "Memperbarui data profil dan kontak");
@@ -914,7 +1067,11 @@ Mohon validasi kelengkapan berkas atlet ini.`);
   };
 
   const handleResetSystem = () => {
-    if (window.confirm("PERINGATAN: Seluruh data atlet dan log tanding akan diarsipkan. Lanjut?")) {
+    setDoubleConfirm({
+      title: "Arsipkan & Reset Sistem",
+      message: "Seluruh data atlet, kontingen, dan log akan dihapus dari sistem. Sistem akan kembali kosong.",
+      confirmWord: "RESET",
+      onConfirm: () => {
       // Prepare backup JSON
       const backupData = {
         athletes,
@@ -939,7 +1096,9 @@ Mohon validasi kelengkapan berkas atlet ini.`);
       setCurrentUser(null);
       setActiveView("login");
       alert("Sistem berhasil diarsipkan & dikosongkan untuk turnamen baru!");
+      setDoubleConfirm(null);
     }
+    });
   };
 
   const handleLogout = () => {
@@ -989,6 +1148,12 @@ Mohon validasi kelengkapan berkas atlet ini.`);
 
   const renderActiveView = () => {
     switch (activeView) {
+      case "statistik-distribusi":
+        if (currentUser?.role === "admin") {
+          return <AdminStatistics athletes={athletes} />;
+        }
+        return null;
+
       case "dashboard":
         if (currentUser?.role === "admin") {
           return (
@@ -1033,6 +1198,13 @@ Mohon validasi kelengkapan berkas atlet ini.`);
                 }
               }}
               onAddContingent={handleAddContingent}
+              onPrintLaporan={() => {
+                setIsPrintingLaporan(true);
+                setTimeout(() => {
+                  window.print();
+                  setIsPrintingLaporan(false);
+                }, 500);
+              }}
               onDeleteContingent={handleDeleteContingent}
               onNavigateToPayment={() => setActiveView("kelola-pembayaran")}
               onNavigateToAthletes={() => setActiveView("atlet-seluruh")}
@@ -1041,6 +1213,7 @@ Mohon validasi kelengkapan berkas atlet ini.`);
                 setSelectedAthlete(null);
                 setIsEditingAthlete(true);
               }}
+              onImportExcelAthletes={handleImportExcelAthletes}
             />
           );
         } else if (currentUser) {
@@ -1080,6 +1253,12 @@ Mohon validasi kelengkapan berkas atlet ini.`);
               }}
             />
           );
+        }
+        return null;
+
+      case "rekap-kontingen":
+        if (currentUser && currentUser.role === "kontingen") {
+          return <RekapKontingen athletes={athletes.filter(a => a.kontingen === currentUser.contingentName)} />;
         }
         return null;
 
@@ -1667,29 +1846,82 @@ Mohon validasi kelengkapan berkas atlet ini.`);
       case "id-card-cetak":
         return (
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-6">
-            <div>
-              <h2 className="font-extrabold text-slate-900 text-lg uppercase tracking-tight">
-                Cetak Massal ID Card Badge Lanyard
-              </h2>
-              <p className="text-xs text-slate-400 mt-1 font-semibold">Tampilkan list ID Card atlet dari kontingen spesifik untuk print massal.</p>
+            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+              <div>
+                <h2 className="font-extrabold text-slate-900 text-lg uppercase tracking-tight">
+                  Cetak Massal ID Card Badge Lanyard
+                </h2>
+                <p className="text-xs text-slate-400 mt-1 font-semibold">Pilih satu atau lebih kontingen untuk mencetak ID Card massal.</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setBulkIdCardsTargets(contingents.filter(c => c.role === "kontingen").map(c => c.contingentName))}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors"
+                >
+                  Pilih Semua
+                </button>
+                <button
+                  onClick={() => setBulkIdCardsTargets([])}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors"
+                >
+                  Reset
+                </button>
+              </div>
             </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
-              {contingents
-                .filter(c => c.role === "kontingen")
-                .map(c => (
-                  <button
-                    key={c.id}
-                    onClick={() => setBulkIdCardsTarget(c.contingentName)}
-                    className="p-4 bg-slate-50 border border-slate-150 hover:border-red-600 rounded-2xl text-left transition-all space-y-1.5"
-                  >
-                    <strong className="text-xs font-bold text-slate-800 block truncate">{c.contingentName}</strong>
-                    <span className="text-[10px] text-slate-400 font-semibold block">
-                      {athletes.filter(a => a.kontingen === c.contingentName && a.isAcc).length} Atlet Ter-ACC
-                    </span>
-                  </button>
-                ))}
-            </div>
+            
+            {bulkIdCardsTargets.length === 0 ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+                  {contingents
+                    .filter(c => c.role === "kontingen")
+                    .map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => setBulkIdCardsTargets(prev => prev.includes(c.contingentName) ? prev.filter(p => p !== c.contingentName) : [...prev, c.contingentName])}
+                        className={`p-4 border rounded-2xl text-left transition-all space-y-1.5 ${
+                          bulkIdCardsTargets.includes(c.contingentName)
+                            ? "bg-emerald-50 border-emerald-500 shadow-sm shadow-emerald-100 ring-2 ring-emerald-500/20"
+                            : "bg-slate-50 border-slate-150 hover:border-emerald-300"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                           <strong className="text-xs font-bold text-slate-800 block truncate">{c.contingentName}</strong>
+                           <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${bulkIdCardsTargets.includes(c.contingentName) ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'}`}>
+                             {bulkIdCardsTargets.includes(c.contingentName) && <span className="text-white text-[10px]">✓</span>}
+                           </div>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-semibold block">
+                          {athletes.filter(a => a.kontingen === c.contingentName && a.isAcc).length} Atlet Ter-ACC
+                        </span>
+                      </button>
+                    ))}
+                </div>
+            ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+                  {contingents
+                    .filter(c => c.role === "kontingen")
+                    .map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => setBulkIdCardsTargets(prev => prev.includes(c.contingentName) ? prev.filter(p => p !== c.contingentName) : [...prev, c.contingentName])}
+                        className={`p-4 border rounded-2xl text-left transition-all space-y-1.5 ${
+                          bulkIdCardsTargets.includes(c.contingentName)
+                            ? "bg-emerald-50 border-emerald-500 shadow-sm shadow-emerald-100 ring-2 ring-emerald-500/20"
+                            : "bg-slate-50 border-slate-150 hover:border-emerald-300"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                           <strong className="text-xs font-bold text-slate-800 block truncate">{c.contingentName}</strong>
+                           <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${bulkIdCardsTargets.includes(c.contingentName) ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'}`}>
+                             {bulkIdCardsTargets.includes(c.contingentName) && <span className="text-white text-[10px]">✓</span>}
+                           </div>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-semibold block">
+                          {athletes.filter(a => a.kontingen === c.contingentName && a.isAcc).length} Atlet Ter-ACC
+                        </span>
+                      </button>
+                    ))}
+                </div>
+            )}
           </div>
         );
 
@@ -1944,7 +2176,7 @@ Mohon validasi kelengkapan berkas atlet ini.`);
               >
                 <Menu size={22} />
               </button>
-              <div className="flex items-center gap-2.5">
+              <button onClick={() => setActiveView("dashboard")} className="flex items-center gap-2.5 text-left cursor-pointer hover:opacity-80 transition-opacity">
                 {settings.logoUrl && (
                   <img src={settings.logoUrl} alt="Logo" className="h-8 w-8 object-contain rounded-md bg-white p-0.5" />
                 )}
@@ -1952,19 +2184,20 @@ Mohon validasi kelengkapan berkas atlet ini.`);
                   <h1 className="font-extrabold text-sm md:text-base tracking-tight leading-none uppercase">{settings.eventTitle}</h1>
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mt-1">Sistem Pendaftaran</span>
                 </div>
-              </div>
+              </button>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:block text-right">
+            <div className="flex items-center gap-4">
+              {settings.regEnd && <CountdownWidget targetDate={settings.regEnd} />}
+              <div className="hidden sm:block text-right border-l border-slate-700 pl-4">
                 <div className="text-xs font-bold text-slate-200">{currentUser.contingentName}</div>
-                <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest block">
+                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block">
                   {currentUser.role === "admin" ? "MASTER ADMIN" : `PJ: ${currentUser.pjName}`}
                 </span>
               </div>
               <button
                 onClick={handleLogout}
-                className="p-2 bg-slate-800 hover:bg-red-950/40 text-slate-400 hover:text-red-400 rounded-xl transition-all border border-slate-700/50"
+                className="p-2 bg-slate-800 hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 rounded-xl transition-all border border-slate-700/50 ml-1"
                 title="Keluar"
               >
                 <LogOut size={16} />
@@ -1986,7 +2219,7 @@ Mohon validasi kelengkapan berkas atlet ini.`);
               setSelectedAthlete(null);
               setIsEditingAthlete(false);
               setIsViewingIdCard(false);
-              setBulkIdCardsTarget(null);
+              setBulkIdCardsTargets([]);
             }}
             activeView={activeView}
             onLogout={handleLogout}
@@ -2001,7 +2234,7 @@ Mohon validasi kelengkapan berkas atlet ini.`);
           />
 
           {/* Main workspace container */}
-          <main className={`flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto relative z-10 ${bulkIdCardsTarget ? "no-print" : ""}`}>
+          <main className={`flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto relative z-10 ${bulkIdCardsTargets.length > 0 || isPrintingLaporan ? "no-print" : ""}`}>
             <AnimatePresence mode="wait">
               {isEditingAthlete ? (
                 <motion.div
@@ -2043,7 +2276,7 @@ Mohon validasi kelengkapan berkas atlet ini.`);
                     }}
                   />
                 </motion.div>
-              ) : bulkIdCardsTarget ? (
+              ) : bulkIdCardsTargets.length > 0 ? (
                 /* BULK PRINT LAYOUT */
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -2051,16 +2284,20 @@ Mohon validasi kelengkapan berkas atlet ini.`);
                 >
                   <IdCardPreview
                     athletes={(() => {
-                      const tgt = contingents.find(c => c.contingentName === bulkIdCardsTarget);
-                      const officials = tgt ? [
-                        { name: tgt.pjName || "Penanggung Jawab", kontingen: tgt.contingentName, kategori: "Official", kelas: "", id: "mgr", isOfficial: true, officialRole: "MANAGER", photoUrl: tgt.managerPhotoUrl },
-                        ...(tgt.official1Name || tgt.official1PhotoUrl ? [{ name: tgt.official1Name || tgt.contingentName, kontingen: tgt.contingentName, kategori: "Official", kelas: "", id: "off1", isOfficial: true, officialRole: "OFFICIAL", photoUrl: tgt.official1PhotoUrl }] : [{ name: tgt.contingentName, kontingen: tgt.contingentName, kategori: "Official", kelas: "", id: "off1", isOfficial: true, officialRole: "OFFICIAL" }]),
-                        ...(tgt.official2Name || tgt.official2PhotoUrl ? [{ name: tgt.official2Name || tgt.contingentName, kontingen: tgt.contingentName, kategori: "Official", kelas: "", id: "off2", isOfficial: true, officialRole: "OFFICIAL", photoUrl: tgt.official2PhotoUrl }] : [{ name: tgt.contingentName, kontingen: tgt.contingentName, kategori: "Official", kelas: "", id: "off2", isOfficial: true, officialRole: "OFFICIAL" }])
-                      ] : [];
-                      return [...officials, ...athletes.filter(a => a.kontingen === bulkIdCardsTarget && a.isAcc)];
+                      let allTargetAthletes: any[] = [];
+                      for (const t of bulkIdCardsTargets) {
+                          const tgt = contingents.find(c => c.contingentName === t);
+                          const officials = tgt ? [
+                            { name: tgt.pjName || "Penanggung Jawab", kontingen: tgt.contingentName, kategori: "Official", kelas: "", id: `mgr-${tgt.id}`, isOfficial: true, officialRole: "MANAGER", photoUrl: tgt.managerPhotoUrl },
+                            ...(tgt.official1Name || tgt.official1PhotoUrl ? [{ name: tgt.official1Name || tgt.contingentName, kontingen: tgt.contingentName, kategori: "Official", kelas: "", id: `off1-${tgt.id}`, isOfficial: true, officialRole: "OFFICIAL", photoUrl: tgt.official1PhotoUrl }] : [{ name: tgt.contingentName, kontingen: tgt.contingentName, kategori: "Official", kelas: "", id: `off1-${tgt.id}`, isOfficial: true, officialRole: "OFFICIAL" }]),
+                            ...(tgt.official2Name || tgt.official2PhotoUrl ? [{ name: tgt.official2Name || tgt.contingentName, kontingen: tgt.contingentName, kategori: "Official", kelas: "", id: `off2-${tgt.id}`, isOfficial: true, officialRole: "OFFICIAL", photoUrl: tgt.official2PhotoUrl }] : [{ name: tgt.contingentName, kontingen: tgt.contingentName, kategori: "Official", kelas: "", id: `off2-${tgt.id}`, isOfficial: true, officialRole: "OFFICIAL" }])
+                          ] : [];
+                          allTargetAthletes = [...allTargetAthletes, ...officials, ...athletes.filter(a => a.kontingen === t && a.isAcc)];
+                      }
+                      return allTargetAthletes;
                     })()}
                     settings={settings}
-                    onCancel={() => setBulkIdCardsTarget(null)}
+                    onCancel={() => setBulkIdCardsTargets([])}
                   />
                 </motion.div>
               ) : (
@@ -2080,13 +2317,26 @@ Mohon validasi kelengkapan berkas atlet ini.`);
 
           {/* 2. PRINT TARGET OVERLAY (ONLY DISPLAYED IN PRINT MODE FOR BADGES) */}
           <div className="hidden print:block absolute inset-0 bg-white">
+            {isPrintingLaporan && (
+              <CetakLaporanPDF athletes={athletes} contingents={contingents} settings={settings} />
+            )}
             {/* If printing bulk */}
-            {bulkIdCardsTarget && (
+            {!isPrintingLaporan && bulkIdCardsTargets.length > 0 && (
               <div className="flex flex-wrap justify-start gap-8 bg-white p-0">
-                {athletes
-                  .filter(a => a.kontingen === bulkIdCardsTarget && a.isAcc)
-                  .map(a => {
-                    let photoUrl = a.fotos[0] || "";
+                {(() => {
+                  let allTargets: any[] = [];
+                  for (const t of bulkIdCardsTargets) {
+                      const tgt = contingents.find(c => c.contingentName === t);
+                      const officials = tgt ? [
+                        { name: tgt.pjName || "Penanggung Jawab", kontingen: tgt.contingentName, kategori: "Official", kelas: "", id: `mgr-${tgt.id}`, isOfficial: true, officialRole: "MANAGER", photoUrl: tgt.managerPhotoUrl },
+                        ...(tgt.official1Name || tgt.official1PhotoUrl ? [{ name: tgt.official1Name || tgt.contingentName, kontingen: tgt.contingentName, kategori: "Official", kelas: "", id: `off1-${tgt.id}`, isOfficial: true, officialRole: "OFFICIAL", photoUrl: tgt.official1PhotoUrl }] : [{ name: tgt.contingentName, kontingen: tgt.contingentName, kategori: "Official", kelas: "", id: `off1-${tgt.id}`, isOfficial: true, officialRole: "OFFICIAL" }]),
+                        ...(tgt.official2Name || tgt.official2PhotoUrl ? [{ name: tgt.official2Name || tgt.contingentName, kontingen: tgt.contingentName, kategori: "Official", kelas: "", id: `off2-${tgt.id}`, isOfficial: true, officialRole: "OFFICIAL", photoUrl: tgt.official2PhotoUrl }] : [{ name: tgt.contingentName, kontingen: tgt.contingentName, kategori: "Official", kelas: "", id: `off2-${tgt.id}`, isOfficial: true, officialRole: "OFFICIAL" }])
+                      ] : [];
+                      allTargets = [...allTargets, ...officials, ...athletes.filter(a => a.kontingen === t && a.isAcc)];
+                  }
+                  return allTargets;
+                })().map(a => {
+                    let photoUrl = (a as any).photoUrl || a.fotos?.[0] || "";
                     const bgThemes: Record<string, string> = {
                       slate: "from-slate-900 via-slate-800 to-slate-950 text-white border border-slate-800",
                       red: "from-red-950 via-red-900 to-slate-950 text-white border border-red-950",
@@ -2368,8 +2618,8 @@ Mohon validasi kelengkapan berkas atlet ini.`);
                   </div>
 
                   <div className="w-full h-80 rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center p-2">
-                    {selectedAthlete.fotos[0] ? (
-                      <img src={selectedAthlete.fotos[0]} alt="Bukti Transfer" className="w-full h-full object-contain" />
+                    {selectedAthlete.fotos?.[0] ? (
+                      <img src={selectedAthlete.fotos?.[0]} alt="Bukti Transfer" className="w-full h-full object-contain" />
                     ) : (
                       <span className="text-slate-400 font-bold text-xs">Bukti Transfer belum diunggah.</span>
                     )}

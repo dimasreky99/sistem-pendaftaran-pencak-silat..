@@ -1,0 +1,6 @@
+{
+  "name": "Sistem Pendaftaran Pencak Silat",
+  "description": "Sistem Pendaftaran Peserta, Timbang Badan, Cetak ID Card, dan Bracket Bagan Pertandingan Pencak Silat",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -4,6 +4,8 @@ import {
   ChevronRight, Eye, Phone, RefreshCw, Layers, Sparkles
 } from "lucide-react";
 import { Athlete, Contingent, SystemSettings } from "../types";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface AdminPaymentManagementProps {
   contingents: Contingent[];
@@ -12,6 +14,7 @@ interface AdminPaymentManagementProps {
   onUpdateContingentPaymentStatus: (contingentId: string, status: "Lunas" | "Belum Lunas") => void;
   onUpdateContingentNominalRevisi: (contingentId: string, nominal?: number) => void;
   onUpdateInvoiceNumber?: (contingentId: string, invoiceNum: string) => void;
+  onUpdateSettings?: (newSettings: SystemSettings) => void;
 }
 
 export default function AdminPaymentManagement({
@@ -20,7 +23,8 @@ export default function AdminPaymentManagement({
   settings,
   onUpdateContingentPaymentStatus,
   onUpdateContingentNominalRevisi,
-  onUpdateInvoiceNumber
+  onUpdateInvoiceNumber,
+  onUpdateSettings
 }: AdminPaymentManagementProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"semua" | "lunas" | "belum_lunas" | "bukti">("semua");
@@ -28,6 +32,38 @@ export default function AdminPaymentManagement({
   const [tempNominal, setTempNominal] = useState("");
   const [selectedProofUrl, setSelectedProofUrl] = useState<string | null>(null);
   const [isPreviewReportOpen, setIsPreviewReportOpen] = useState(false);
+  const [qrisUploading, setQrisUploading] = useState(false);
+
+  const handleQrisUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Ukuran file terlalu besar. Maksimal 2MB.");
+      return;
+    }
+
+    setQrisUploading(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64String = event.target?.result as string;
+      if (onUpdateSettings) {
+        onUpdateSettings({ ...settings, qrisPhotoUrl: base64String });
+      } else {
+        alert("Fungsi update setting tidak tersedia.");
+      }
+      setQrisUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveQris = () => {
+    if (confirm("Hapus QRIS saat ini?")) {
+      if (onUpdateSettings) {
+        onUpdateSettings({ ...settings, qrisPhotoUrl: "" });
+      }
+    }
+  };
 
   // Helper formatting currency
   const formatRupiah = (val: number) => {
@@ -119,7 +155,85 @@ export default function AdminPaymentManagement({
   };
 
   const triggerPrint = () => {
-    window.print();
+    const doc = new jsPDF('landscape');
+    
+    // Header
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("LAPORAN KEUANGAN & PEMBAYARAN KONTINGEN", doc.internal.pageSize.width / 2, 15, { align: 'center' });
+    
+    doc.setFontSize(11);
+    doc.text(`Turnamen Silat: ${settings.eventTitle || "SILAT REGIONAL TOURNAMENT"}`, doc.internal.pageSize.width / 2, 22, { align: 'center' });
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    const dateStr = new Date().toLocaleDateString("id-ID", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + " - " + new Date().toLocaleTimeString("id-ID");
+    doc.text(`Dicetak pada: ${dateStr}`, doc.internal.pageSize.width / 2, 28, { align: 'center' });
+
+    // Table data
+    const tableData = calculatedData.map((row, i) => [
+      i + 1,
+      row.contingent.contingentName.toUpperCase(),
+      `${row.contingent.pjName} (${row.contingent.nowa})`,
+      row.athleteCount.toString(),
+      row.categoriesList.join(", ") || "-",
+      formatRupiah(row.finalBill),
+      row.contingent.paymentStatus
+    ]);
+
+    // Totals
+    const totalAthletes = calculatedData.reduce((sum, item) => sum + item.athleteCount, 0);
+    const totalBill = calculatedData.reduce((sum, item) => sum + item.finalBill, 0);
+    const totalPaid = calculatedData.filter(i => i.contingent.paymentStatus === "Lunas").length;
+
+    tableData.push([
+      "",
+      "TOTAL KESELURUHAN:",
+      "",
+      `${totalAthletes} Atlet`,
+      "",
+      formatRupiah(totalBill),
+      `Lunas: ${totalPaid} Kontingen`
+    ]);
+
+    autoTable(doc, {
+      startY: 35,
+      head: [['No', 'Nama Kontingen', 'Penanggung Jawab', 'Jumlah Atlet', 'Kategori Terdaftar', 'Tagihan Akhir', 'Status Bayar']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
+      columnStyles: {
+        0: { cellWidth: 10, halign: 'center' },
+        3: { cellWidth: 25, halign: 'center', fontStyle: 'bold' },
+        5: { cellWidth: 35, halign: 'right', fontStyle: 'bold' },
+        6: { cellWidth: 35, halign: 'center', fontStyle: 'bold' },
+      },
+      didParseCell: function (data) {
+        if (data.row.index === tableData.length - 1) {
+          data.cell.styles.fillColor = [241, 245, 249];
+          data.cell.styles.fontStyle = 'bold';
+        }
+      }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY || 50;
+
+    // Signatures
+    doc.setFontSize(10);
+    doc.text("Mengetahui,", 50, finalY + 20, { align: 'center' });
+    doc.text("Ketua Panitia Pelaksana", 50, finalY + 25, { align: 'center' });
+    doc.line(20, finalY + 45, 80, finalY + 45);
+    doc.setFontSize(8);
+    doc.text("TANDA TANGAN & NAMA TERANG", 50, finalY + 50, { align: 'center' });
+
+    doc.setFontSize(10);
+    doc.text("Bendahara Turnamen / Admin Keuangan", doc.internal.pageSize.width - 60, finalY + 25, { align: 'center' });
+    doc.line(doc.internal.pageSize.width - 100, finalY + 45, doc.internal.pageSize.width - 20, finalY + 45);
+    doc.setFontSize(8);
+    doc.text("TANDA TANGAN & NAMA TERANG", doc.internal.pageSize.width - 60, finalY + 50, { align: 'center' });
+
+    doc.save(`Laporan_Keuangan_Kontingen_${new Date().getTime()}.pdf`);
   };
 
   return (
@@ -163,6 +277,49 @@ export default function AdminPaymentManagement({
           </button>
         </div>
       </div>
+
+            {/* QRIS MANAGEMENT SECTION */}
+      {!isPreviewReportOpen && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm print:hidden">
+          <div className="flex flex-col md:flex-row md:items-start gap-6">
+            <div className="flex-1">
+              <h3 className="font-extrabold text-slate-800 text-sm uppercase tracking-wider mb-2 flex items-center gap-2">
+                <CreditCard size={18} className="text-emerald-600" />
+                Manajemen QRIS Pembayaran
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed font-medium mb-4">
+                Unggah foto QRIS di sini agar kontingen dapat langsung melakukan pemindaian (scan) untuk melunasi pembayaran pendaftaran mereka. QRIS akan otomatis muncul di Dashboard Kontingen bagi kontingen yang statusnya "Belum Lunas".
+              </p>
+              
+              <div className="flex items-center gap-3">
+                <label className="bg-slate-900 hover:bg-slate-800 text-white cursor-pointer font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm">
+                  {qrisUploading ? "Mengunggah..." : (settings.qrisPhotoUrl ? "Ganti Foto QRIS" : "Unggah QRIS")}
+                  <input
+                    type="file"
+                    accept="image/png, image/jpeg, image/jpg"
+                    className="hidden"
+                    onChange={handleQrisUpload}
+                    disabled={qrisUploading}
+                  />
+                </label>
+                {settings.qrisPhotoUrl && (
+                  <button
+                    onClick={handleRemoveQris}
+                    className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-xs px-4 py-2.5 rounded-xl transition-all"
+                  >
+                    Hapus
+                  </button>
+                )}
+              </div>
+            </div>
+            {settings.qrisPhotoUrl && (
+              <div className="w-full md:w-32 h-32 rounded-2xl bg-slate-50 border border-slate-200 overflow-hidden flex-shrink-0 shadow-inner p-2 relative group">
+                <img src={settings.qrisPhotoUrl} alt="QRIS" className="w-full h-full object-contain" />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* SEARCH & FILTERS CONTROLS (Hidden on Print) */}
       {!isPreviewReportOpen && (
@@ -238,6 +395,7 @@ export default function AdminPaymentManagement({
                   <th className="py-3.5 px-4 text-center">Atlet</th>
                   <th className="py-3.5 px-4">Kategori Terpilih</th>
                   
+                  <th className="py-3.5 px-4">Invoice</th>
                   <th className="py-3.5 px-4 text-center">Bukti Bayar</th>
                   <th className="py-3.5 px-4 text-center">Aksi Status</th>
                 </tr>

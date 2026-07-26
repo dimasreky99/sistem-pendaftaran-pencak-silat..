@@ -56,7 +56,10 @@ export function useFirebaseCollection<T extends { id: string }>(collectionName: 
         if (!newItem.id) continue;
         const oldItem = oldMap.get(newItem.id);
         if (!oldItem || JSON.stringify(oldItem) !== JSON.stringify(newItem)) {
-          batch.set(doc(db, collectionName, String(newItem.id)), newItem);
+          // Firebase doesn't support undefined values, so we strip them
+          // using JSON parse/stringify which naturally drops undefined keys.
+          const cleanItem = JSON.parse(JSON.stringify(newItem));
+          batch.set(doc(db, collectionName, String(newItem.id)), cleanItem);
           opCount++;
         }
       }
@@ -70,7 +73,8 @@ export function useFirebaseCollection<T extends { id: string }>(collectionName: 
         } else {
            console.warn("Too many operations for a single batch. Doing sequential sets.");
            for (const newItem of newData) {
-             await setDoc(doc(db, collectionName, String(newItem.id)), newItem);
+             const cleanItem = JSON.parse(JSON.stringify(newItem));
+             await setDoc(doc(db, collectionName, String(newItem.id)), cleanItem);
            }
         }
       }
@@ -106,7 +110,8 @@ export function useFirebaseDoc<T>(docPath: string, initialData: T) {
     setData((prev) => {
        const newData = typeof action === 'function' ? (action as any)(prev) : action;
        if (JSON.stringify(prev) !== JSON.stringify(newData)) {
-         setDoc(doc(db, docPath), newData).catch(e => console.error(e));
+         const cleanData = JSON.parse(JSON.stringify(newData));
+         setDoc(doc(db, docPath), cleanData).catch(e => console.error(e));
        }
        return newData;
     });
